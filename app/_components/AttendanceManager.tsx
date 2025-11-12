@@ -12,7 +12,7 @@ export default function TestPage() {
   return (
     <div className="p-6">
       <button onClick={testApi} className="bg-blue-500 text-white p-2 rounded">
-        Application tester
+        Application tester testing Docuker Hub
       </button>
     </div>
   );
