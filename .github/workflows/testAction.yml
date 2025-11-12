@@ -63,7 +63,7 @@ jobs:
           echo "NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME"
           echo "NEXT_PUBLIC_ENV=$NEXT_PUBLIC_ENV"
           rm -rf node_modules/.cache .next
-          npm run build -- --no-turbo || (echo "❌ Build failed!" && exit 1)
+          npm run build || (echo "❌ Build failed!" && exit 1)
 
       # -----------------------------
       # 6️⃣ Build Docker image
