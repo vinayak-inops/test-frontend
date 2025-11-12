@@ -64,11 +64,11 @@ jobs:
           docker build -t nextjs-app:latest .
 
       # -----------------------------
-      # 7️⃣ Test Docker container
+      # 7️⃣ Run smoke test container
       # -----------------------------
       - name: Run Docker container (smoke test)
         run: |
-          echo "🚀 Starting container..."
+          echo "🚀 Starting container for test..."
           docker run -d -p 3000:3000 --name nextjs-container nextjs-app:latest
           echo "⏳ Waiting for container startup..."
           sleep 8
@@ -84,7 +84,7 @@ jobs:
           curl --fail http://localhost:3000 || (echo "❌ App failed to start" && exit 1)
 
       # -----------------------------
-      # 9️⃣ Push to Docker Hub
+      # 9️⃣ Push image to Docker Hub
       # -----------------------------
       - name: Push image to Docker Hub
         if: github.ref == 'refs/heads/main'
@@ -92,24 +92,34 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
-          echo "🔑 Logging in to Docker Hub..."
+          if [ -z "$DOCKER_USERNAME" ]; then
+            echo "❌ ERROR: DOCKER_USERNAME secret is missing!"
+            exit 1
+          fi
+          if [ -z "$DOCKER_PASSWORD" ]; then
+            echo "❌ ERROR: DOCKER_PASSWORD secret is missing!"
+            exit 1
+          fi
+
+          echo "🔑 Logging in to Docker Hub as $DOCKER_USERNAME..."
           echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-          
-          echo "🏷️ Tagging image..."
-          docker tag nextjs-app:latest $DOCKER_USERNAME/nextjs-app:latest
+
+          IMAGE_NAME="$DOCKER_USERNAME/nextjs-app:latest"
+          echo "🏷️ Tagging image → $IMAGE_NAME"
+          docker tag nextjs-app:latest "$IMAGE_NAME"
 
           echo "⬆️ Pushing image to Docker Hub..."
-          docker push $DOCKER_USERNAME/nextjs-app:latest
+          docker push "$IMAGE_NAME"
 
-          echo "✅ Docker image pushed successfully!"
+          echo "✅ Docker image pushed successfully to Docker Hub!"
 
       # -----------------------------
-      # 🔟 Cleanup containers and images
+      # 🔟 Cleanup
       # -----------------------------
       - name: Cleanup Docker
         if: always()
         run: |
-          echo "🧹 Cleaning up..."
+          echo "🧹 Cleaning up containers and images..."
           docker stop nextjs-container || true
           docker rm nextjs-container || true
           docker image prune -f || true
