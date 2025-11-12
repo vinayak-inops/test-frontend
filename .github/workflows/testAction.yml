@@ -42,7 +42,18 @@ jobs:
           npm ci
 
       # -----------------------------
-      # 4️⃣ Build Next.js app
+      # 4️⃣ Fix Tailwind / SWC native modules
+      # -----------------------------
+      - name: Fix native modules (Tailwind & SWC)
+        run: |
+          echo "🔧 Fixing native Linux builds for Tailwind & SWC..."
+          npm rebuild @tailwindcss/oxide --force || true
+          npm rebuild @next/swc-linux-x64-gnu --force || true
+          npm rebuild lightningcss --force || true
+          echo "✅ Native modules rebuilt successfully."
+
+      # -----------------------------
+      # 5️⃣ Build Next.js app
       # -----------------------------
       - name: Build Next.js app
         run: |
@@ -50,7 +61,7 @@ jobs:
           npm run build
 
       # -----------------------------
-      # 5️⃣ Build Docker image with env vars
+      # 6️⃣ Build Docker image with env vars
       # -----------------------------
       - name: Build Docker image
         run: |
@@ -61,7 +72,7 @@ jobs:
             -t nextjs-app:latest .
 
       # -----------------------------
-      # 6️⃣ Run smoke test container
+      # 7️⃣ Run smoke test container
       # -----------------------------
       - name: Run Docker container (smoke test)
         run: |
@@ -73,7 +84,7 @@ jobs:
           docker logs nextjs-container --tail 20
 
       # -----------------------------
-      # 7️⃣ Verify app health
+      # 8️⃣ Verify app health
       # -----------------------------
       - name: Verify app is running
         run: |
@@ -81,7 +92,7 @@ jobs:
           curl --fail http://localhost:3000 || (echo "❌ App failed to start" && exit 1)
 
       # -----------------------------
-      # 8️⃣ Push image to Docker Hub
+      # 9️⃣ Push image to Docker Hub
       # -----------------------------
       - name: Push image to Docker Hub
         if: github.ref == 'refs/heads/main'
@@ -108,7 +119,7 @@ jobs:
           echo "✅ Docker image pushed successfully to Docker Hub!"
 
       # -----------------------------
-      # 9️⃣ Cleanup
+      # 🔟 Cleanup
       # -----------------------------
       - name: Cleanup Docker
         if: always()
