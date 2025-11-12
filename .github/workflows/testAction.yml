@@ -22,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20 # ✅ Updated to match Next.js v16 requirement
           cache: 'npm'
 
       # 3️⃣ Install dependencies
@@ -38,15 +38,21 @@ jobs:
         run: |
           docker build -t nextjs-app:latest .
 
-      # 6️⃣ Run Docker container (optional for test)
+      # 6️⃣ Run Docker container (for smoke test)
       - name: Run container
         run: |
           docker run -d -p 3000:3000 --name nextjs-container nextjs-app:latest
-          echo "Container started. You can inspect logs below."
+          echo "✅ Container started. Checking health..."
+          sleep 5
           docker ps
           docker logs nextjs-container
 
-      # 7️⃣ Stop and clean up (optional)
+      # 7️⃣ Optional: Test container health (you can skip if not needed)
+      - name: Verify app is running
+        run: |
+          curl --fail http://localhost:3000 || (echo "❌ App failed to start" && exit 1)
+
+      # 8️⃣ Stop and clean up
       - name: Clean up container
         if: always()
         run: |
