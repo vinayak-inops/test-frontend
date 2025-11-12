@@ -12,10 +12,9 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
+      # ✅ Inject from GitHub Secrets
       NEXT_PUBLIC_APP_NAME: ${{ secrets.NEXT_PUBLIC_APP_NAME }}
       NEXT_PUBLIC_ENV: ${{ secrets.NEXT_PUBLIC_ENV }}
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
     steps:
       # -----------------------------
@@ -34,42 +33,45 @@ jobs:
           cache: 'npm'
 
       # -----------------------------
-      # 3️⃣ Install dependencies
+      # 3️⃣ Clean install dependencies
       # -----------------------------
-      - name: Install dependencies
+      - name: Clean install dependencies
         run: |
-          echo "📦 Installing dependencies..."
-          npm ci
+          echo "🧹 Cleaning old dependencies..."
+          rm -rf node_modules package-lock.json
+          echo "📦 Installing fresh dependencies..."
+          npm install
 
       # -----------------------------
-      # 4️⃣ Fix Tailwind / SWC native modules
+      # 4️⃣ Rebuild native modules
       # -----------------------------
-      - name: Fix native modules (Tailwind & SWC)
+      - name: Rebuild native modules
         run: |
-          echo "🔧 Fixing native Linux builds for Tailwind & SWC..."
-          npm rebuild @tailwindcss/oxide --force || true
-          npm rebuild @next/swc-linux-x64-gnu --force || true
-          npm rebuild lightningcss --force || true
-          echo "✅ Native modules rebuilt successfully."
+          echo "🔧 Rebuilding native modules..."
+          npm rebuild @tailwindcss/oxide --verbose || true
+          npm rebuild lightningcss --verbose || true
+          npm rebuild @next/swc-linux-x64-gnu --verbose || true
 
       # -----------------------------
-      # 5️⃣ Build Next.js app
+      # 5️⃣ Build Next.js app (with secrets)
       # -----------------------------
       - name: Build Next.js app
         run: |
           echo "🏗️ Building Next.js..."
+          echo "Using environment variables:"
+          echo " - NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME"
+          echo " - NEXT_PUBLIC_ENV=$NEXT_PUBLIC_ENV"
           npm run build
 
       # -----------------------------
-      # 6️⃣ Build Docker image with env vars
+      # 6️⃣ Build Docker image
       # -----------------------------
       - name: Build Docker image
         run: |
-          echo "🐳 Building Docker image with environment variables..."
-          docker build \
-            --build-arg NEXT_PUBLIC_APP_NAME="${NEXT_PUBLIC_APP_NAME}" \
-            --build-arg NEXT_PUBLIC_ENV="${NEXT_PUBLIC_ENV}" \
-            -t nextjs-app:latest .
+          echo "🐳 Building Docker image..."
+          docker build --build-arg NEXT_PUBLIC_APP_NAME="$NEXT_PUBLIC_APP_NAME" \
+                       --build-arg NEXT_PUBLIC_ENV="$NEXT_PUBLIC_ENV" \
+                       -t nextjs-app:latest .
 
       # -----------------------------
       # 7️⃣ Run smoke test container
@@ -96,6 +98,9 @@ jobs:
       # -----------------------------
       - name: Push image to Docker Hub
         if: github.ref == 'refs/heads/main'
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
           if [ -z "$DOCKER_USERNAME" ]; then
             echo "❌ ERROR: DOCKER_USERNAME secret is missing!"
