@@ -14,47 +14,58 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout your repository code
+      # 1️⃣ Checkout repository
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js (for build)
+      # 2️⃣ Setup Node.js 20 (required for Next.js 16)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20 # ✅ Updated to match Next.js v16 requirement
+          node-version: 20
           cache: 'npm'
 
       # 3️⃣ Install dependencies
       - name: Install dependencies
-        run: npm ci
+        run: npm install
+        # 👆 Using `npm install` (not `npm ci`) to allow native module rebuilds
 
-      # 4️⃣ Build the Next.js app
+      # 4️⃣ Rebuild native modules for Linux (fix lightningcss / swc issues)
+      - name: Rebuild native modules
+        run: |
+          echo "🔧 Rebuilding native modules for Linux..."
+          npm rebuild lightningcss --verbose || true
+          npm rebuild @next/swc-linux-x64-gnu --verbose || true
+
+      # 5️⃣ Build the Next.js app
       - name: Build Next.js
         run: npm run build
 
-      # 5️⃣ Build Docker image
+      # 6️⃣ Build Docker image
       - name: Build Docker image
         run: |
+          echo "🐳 Building Docker image..."
           docker build -t nextjs-app:latest .
 
-      # 6️⃣ Run Docker container (for smoke test)
+      # 7️⃣ Run Docker container for smoke test
       - name: Run container
         run: |
+          echo "🚀 Starting container..."
           docker run -d -p 3000:3000 --name nextjs-container nextjs-app:latest
-          echo "✅ Container started. Checking health..."
-          sleep 5
+          sleep 8
           docker ps
           docker logs nextjs-container
 
-      # 7️⃣ Optional: Test container health (you can skip if not needed)
+      # 8️⃣ Verify app is running
       - name: Verify app is running
         run: |
+          echo "🔍 Checking health..."
           curl --fail http://localhost:3000 || (echo "❌ App failed to start" && exit 1)
 
-      # 8️⃣ Stop and clean up
+      # 9️⃣ Stop and clean up container
       - name: Clean up container
         if: always()
         run: |
+          echo "🧹 Cleaning up..."
           docker stop nextjs-container || true
           docker rm nextjs-container || true
