@@ -10,7 +10,7 @@ export default function TestPage() {
       const res = await apiHelper.organization.countryGet.getAllCountries();
 
       console.log("API Response:", res);
-    } catch (error: any) {
+    } catch (error) {
     }
   }
 
