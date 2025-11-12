@@ -12,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # ✅ Inject from GitHub Secrets
       NEXT_PUBLIC_APP_NAME: ${{ secrets.NEXT_PUBLIC_APP_NAME }}
       NEXT_PUBLIC_ENV: ${{ secrets.NEXT_PUBLIC_ENV }}
 
@@ -33,14 +32,18 @@ jobs:
           cache: 'npm'
 
       # -----------------------------
-      # 3️⃣ Clean install dependencies
+      # 3️⃣ Install dependencies (smart fallback)
       # -----------------------------
-      - name: Clean install dependencies
+      - name: Install dependencies
         run: |
-          echo "🧹 Cleaning old dependencies..."
-          rm -rf node_modules package-lock.json
-          echo "📦 Installing fresh dependencies..."
-          npm ci
+          echo "📦 Installing dependencies..."
+          if [ -f package-lock.json ]; then
+            echo "✅ package-lock.json found — running npm ci"
+            npm ci
+          else
+            echo "⚠️ No package-lock.json found — running npm install"
+            npm install
+          fi
 
       # -----------------------------
       # 4️⃣ Rebuild native modules
@@ -53,17 +56,17 @@ jobs:
           npm rebuild @next/swc-linux-x64-gnu --verbose || true
 
       # -----------------------------
-      # 5️⃣ Build Next.js app (inject envs)
+      # 5️⃣ Build Next.js app (with secrets)
       # -----------------------------
       - name: Build Next.js app
         run: |
-          echo "🏗️ Building Next.js with envs..."
+          echo "🏗️ Building Next.js..."
           echo "NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME"
           echo "NEXT_PUBLIC_ENV=$NEXT_PUBLIC_ENV"
           npm run build
 
       # -----------------------------
-      # 6️⃣ Build Docker image (pass envs)
+      # 6️⃣ Build Docker image
       # -----------------------------
       - name: Build Docker image
         run: |
@@ -78,13 +81,10 @@ jobs:
       # -----------------------------
       - name: Run Docker container (smoke test)
         run: |
-          echo "🚀 Starting container for smoke test..."
-          docker run -d -p 3000:3000 \
-            -e NEXT_PUBLIC_APP_NAME="$NEXT_PUBLIC_APP_NAME" \
-            -e NEXT_PUBLIC_ENV="$NEXT_PUBLIC_ENV" \
-            --name nextjs-container nextjs-app:latest
+          echo "🚀 Starting container for test..."
+          docker run -d -p 3000:3000 --name nextjs-container nextjs-app:latest
           echo "⏳ Waiting for container startup..."
-          sleep 10
+          sleep 8
           docker ps
           docker logs nextjs-container --tail 20
 
@@ -107,15 +107,11 @@ jobs:
         run: |
           echo "🔑 Logging in to Docker Hub..."
           echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-
           IMAGE_NAME="$DOCKER_USERNAME/test-frontend:latest"
           echo "🏷️ Tagging image → $IMAGE_NAME"
           docker tag nextjs-app:latest "$IMAGE_NAME"
-
-          echo "⬆️ Pushing image to Docker Hub..."
           docker push "$IMAGE_NAME"
-
-          echo "✅ Docker image pushed successfully to Docker Hub!"
+          echo "✅ Docker image pushed successfully!"
 
       # -----------------------------
       # 🔟 Cleanup
@@ -127,4 +123,3 @@ jobs:
           docker stop nextjs-container || true
           docker rm nextjs-container || true
           docker image prune -f || true
-          echo "✅ Cleanup complete."
