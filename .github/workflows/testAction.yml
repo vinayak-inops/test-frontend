@@ -1,4 +1,4 @@
-name: 🚀 Next.js CI/CD with Docker Hub
+name: 🚀 Next.js CI/CD with Docker Hub (Fixed Tailwind + Env + Turbo Ready)
 
 on:
   push:
@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
+      # ✅ Inject environment variables from GitHub Secrets
       NEXT_PUBLIC_APP_NAME: ${{ secrets.NEXT_PUBLIC_APP_NAME }}
       NEXT_PUBLIC_ENV: ${{ secrets.NEXT_PUBLIC_ENV }}
 
@@ -32,38 +33,37 @@ jobs:
           cache: 'npm'
 
       # -----------------------------
-      # 3️⃣ Install dependencies (smart fallback)
+      # 3️⃣ Clean install dependencies
       # -----------------------------
-      - name: Install dependencies
+      - name: Clean install dependencies
         run: |
-          echo "📦 Installing dependencies..."
-          if [ -f package-lock.json ]; then
-            echo "✅ package-lock.json found — running npm ci"
-            npm ci
-          else
-            echo "⚠️ No package-lock.json found — running npm install"
-            npm install
-          fi
+          echo "🧹 Cleaning old dependencies..."
+          rm -rf node_modules package-lock.json
+          echo "📦 Installing fresh dependencies..."
+          npm install
 
       # -----------------------------
-      # 4️⃣ Rebuild native modules
+      # 4️⃣ Fix native modules (Tailwind / SWC)
       # -----------------------------
-      - name: Rebuild native modules
+      - name: Fix native modules for Linux runner
         run: |
-          echo "🔧 Rebuilding native modules..."
-          npm rebuild @tailwindcss/oxide --verbose || true
-          npm rebuild lightningcss --verbose || true
-          npm rebuild @next/swc-linux-x64-gnu --verbose || true
+          echo "🔧 Reinstalling native modules..."
+          npm uninstall @tailwindcss/oxide || true
+          npm install @tailwindcss/oxide --force --ignore-scripts
+          npm rebuild @tailwindcss/oxide --build-from-source || true
+          npm rebuild @next/swc-linux-x64-gnu --build-from-source || true
+          npm rebuild lightningcss --build-from-source || true
 
       # -----------------------------
-      # 5️⃣ Build Next.js app (with secrets)
+      # 5️⃣ Build Next.js app (with env vars)
       # -----------------------------
       - name: Build Next.js app
         run: |
           echo "🏗️ Building Next.js..."
           echo "NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME"
           echo "NEXT_PUBLIC_ENV=$NEXT_PUBLIC_ENV"
-          npm run build
+          rm -rf node_modules/.cache .next
+          npm run build -- --no-turbo || (echo "❌ Build failed!" && exit 1)
 
       # -----------------------------
       # 6️⃣ Build Docker image
@@ -77,13 +77,13 @@ jobs:
             -t nextjs-app:latest .
 
       # -----------------------------
-      # 7️⃣ Run smoke test container
+      # 7️⃣ Run container (smoke test)
       # -----------------------------
       - name: Run Docker container (smoke test)
         run: |
-          echo "🚀 Starting container for test..."
+          echo "🚀 Running container for smoke test..."
           docker run -d -p 3000:3000 --name nextjs-container nextjs-app:latest
-          echo "⏳ Waiting for container startup..."
+          echo "⏳ Waiting for startup..."
           sleep 8
           docker ps
           docker logs nextjs-container --tail 20
@@ -105,12 +105,25 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
+          if [ -z "$DOCKER_USERNAME" ]; then
+            echo "❌ ERROR: Missing DOCKER_USERNAME secret!"
+            exit 1
+          fi
+          if [ -z "$DOCKER_PASSWORD" ]; then
+            echo "❌ ERROR: Missing DOCKER_PASSWORD secret!"
+            exit 1
+          fi
+
           echo "🔑 Logging in to Docker Hub..."
           echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
           IMAGE_NAME="$DOCKER_USERNAME/test-frontend:latest"
           echo "🏷️ Tagging image → $IMAGE_NAME"
           docker tag nextjs-app:latest "$IMAGE_NAME"
+
+          echo "⬆️ Pushing image to Docker Hub..."
           docker push "$IMAGE_NAME"
+
           echo "✅ Docker image pushed successfully!"
 
       # -----------------------------
@@ -119,7 +132,8 @@ jobs:
       - name: Cleanup Docker
         if: always()
         run: |
-          echo "🧹 Cleaning up containers and images..."
+          echo "🧹 Cleaning up..."
           docker stop nextjs-container || true
           docker rm nextjs-container || true
           docker image prune -f || true
+          echo "✅ Cleanup complete."
