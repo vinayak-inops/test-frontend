@@ -104,7 +104,7 @@ jobs:
           echo "🔑 Logging in to Docker Hub as $DOCKER_USERNAME..."
           echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
-          IMAGE_NAME="$DOCKER_USERNAME/nextjs-app:latest"
+          IMAGE_NAME="$DOCKER_USERNAME/test-frontend:latest"
           echo "🏷️ Tagging image → $IMAGE_NAME"
           docker tag nextjs-app:latest "$IMAGE_NAME"
 
