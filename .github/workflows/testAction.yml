@@ -40,7 +40,7 @@ jobs:
           echo "🧹 Cleaning old dependencies..."
           rm -rf node_modules package-lock.json
           echo "📦 Installing fresh dependencies..."
-          npm install
+          npm ci
 
       # -----------------------------
       # 4️⃣ Rebuild native modules
@@ -53,35 +53,38 @@ jobs:
           npm rebuild @next/swc-linux-x64-gnu --verbose || true
 
       # -----------------------------
-      # 5️⃣ Build Next.js app (with secrets)
+      # 5️⃣ Build Next.js app (inject envs)
       # -----------------------------
       - name: Build Next.js app
         run: |
-          echo "🏗️ Building Next.js..."
-          echo "Using environment variables:"
-          echo " - NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME"
-          echo " - NEXT_PUBLIC_ENV=$NEXT_PUBLIC_ENV"
+          echo "🏗️ Building Next.js with envs..."
+          echo "NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME"
+          echo "NEXT_PUBLIC_ENV=$NEXT_PUBLIC_ENV"
           npm run build
 
       # -----------------------------
-      # 6️⃣ Build Docker image
+      # 6️⃣ Build Docker image (pass envs)
       # -----------------------------
       - name: Build Docker image
         run: |
           echo "🐳 Building Docker image..."
-          docker build --build-arg NEXT_PUBLIC_APP_NAME="$NEXT_PUBLIC_APP_NAME" \
-                       --build-arg NEXT_PUBLIC_ENV="$NEXT_PUBLIC_ENV" \
-                       -t nextjs-app:latest .
+          docker build \
+            --build-arg NEXT_PUBLIC_APP_NAME="$NEXT_PUBLIC_APP_NAME" \
+            --build-arg NEXT_PUBLIC_ENV="$NEXT_PUBLIC_ENV" \
+            -t nextjs-app:latest .
 
       # -----------------------------
       # 7️⃣ Run smoke test container
       # -----------------------------
       - name: Run Docker container (smoke test)
         run: |
-          echo "🚀 Starting container for test..."
-          docker run -d -p 3000:3000 --name nextjs-container nextjs-app:latest
+          echo "🚀 Starting container for smoke test..."
+          docker run -d -p 3000:3000 \
+            -e NEXT_PUBLIC_APP_NAME="$NEXT_PUBLIC_APP_NAME" \
+            -e NEXT_PUBLIC_ENV="$NEXT_PUBLIC_ENV" \
+            --name nextjs-container nextjs-app:latest
           echo "⏳ Waiting for container startup..."
-          sleep 8
+          sleep 10
           docker ps
           docker logs nextjs-container --tail 20
 
@@ -102,16 +105,7 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
-          if [ -z "$DOCKER_USERNAME" ]; then
-            echo "❌ ERROR: DOCKER_USERNAME secret is missing!"
-            exit 1
-          fi
-          if [ -z "$DOCKER_PASSWORD" ]; then
-            echo "❌ ERROR: DOCKER_PASSWORD secret is missing!"
-            exit 1
-          fi
-
-          echo "🔑 Logging in to Docker Hub as $DOCKER_USERNAME..."
+          echo "🔑 Logging in to Docker Hub..."
           echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
           IMAGE_NAME="$DOCKER_USERNAME/test-frontend:latest"
