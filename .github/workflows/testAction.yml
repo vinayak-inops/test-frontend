@@ -1,4 +1,4 @@
-name: Next.js CI
+name: Next.js CI with Docker
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    name: Build and Test Next.js App
+    name: Build and Test with Docker
     runs-on: ubuntu-latest
 
     steps:
@@ -18,7 +18,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js
+      # 2️⃣ Setup Node.js (for build)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -29,17 +29,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 4️⃣ Build the Next.js application
-      - name: Build application
+      # 4️⃣ Build the Next.js app
+      - name: Build Next.js
         run: npm run build
 
-      # 5️⃣ Run tests (optional - remove if not needed)
-      - name: Run tests
-        run: npm test
+      # 5️⃣ Build Docker image
+      - name: Build Docker image
+        run: |
+          docker build -t nextjs-app:latest .
 
-      # 6️⃣ Upload build artifacts (optional)
-      - name: Upload production build
-        uses: actions/upload-artifact@v4
-        with:
-          name: next-build
-          path: .next
+      # 6️⃣ Run Docker container (optional for test)
+      - name: Run container
+        run: |
+          docker run -d -p 3000:3000 --name nextjs-container nextjs-app:latest
+          echo "Container started. You can inspect logs below."
+          docker ps
+          docker logs nextjs-container
+
+      # 7️⃣ Stop and clean up (optional)
+      - name: Clean up container
+        if: always()
+        run: |
+          docker stop nextjs-container || true
+          docker rm nextjs-container || true
