@@ -29,18 +29,20 @@ WORKDIR /app
 # Environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
-# Ensure Next.js runs in standalone mode for efficiency (if using next build standalone)
-# ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Copy only required files from builder
+# Copy required files from builder stage
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.js ./next.config.js
 COPY --from=builder /app/node_modules ./node_modules
+
+# ✅ Optional: copy next.config.js *only if it exists*
+# (commented out to avoid build failure if file missing)
+# COPY --from=builder /app/next.config.js ./next.config.js
 
 # Expose application port
 EXPOSE 3000
 
-# Start the Next.js app
-CMD ["npm", "start"]
+# ✅ Use Next.js built-in production server
+CMD ["npm", "run", "start"]
